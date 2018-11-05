@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+findiff = "*"
+pint = "*"
+intel-numpy = "*"
+pandas = "*"
+scipy = "*"
+pytest = "*"
+hypothesis = "*"
+black = "*"
+
+[dev-packages]
+pytest = "*"
+hypothesis = "*"
+black = "*"
+ipython = "*"
+
+[requires]
+python_version = "3.6"
