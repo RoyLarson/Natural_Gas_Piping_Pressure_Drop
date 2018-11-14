@@ -15,7 +15,7 @@ G_c_lbm_ft_per_lbf_s2 = 32.174
 G_ft_sec2 = 32.174
 IN_PER_FT = 12
 
-class Simple_NG:
+class SimpleNG:
     """
     Calculates the equation of state for a natural gas that is solely specified by the Molecular Weight
     References
@@ -330,13 +330,12 @@ class GasFlow:
     _scf_per_lbmol = self._R_psi_ft3 * (self.std_T_F + F_TO_R) / self.std_P_psia
     _g = G_ft_sec2  # standard gravity ft/sec^2
 
-    def __init__(self, temperature_F, pressure_psia, rate_mscfd, pipe, fluid, dp_with_flow=True):
+    def __init__(self, *, rate_mscfd, pipe, fluid, dp_with_flow=True):
         """
         dp_with_flow = True if solving dp in the direction of flow
         dp_with_flow = False if solving dp in the against the direction of flow
         """
-        self.P = pressure_psia
-        self.T = temperature_F
+
         self.Q = rate_mscfd
         self.pipe = pipe
         self.fluid = fluid
@@ -362,12 +361,12 @@ class GasFlow:
     def mass_flowrate(self):
         """Returns mass flow in lb/sec"""
         scfs = self.Q*1000/(24*60*60)
-        return (scfs / self._scf_per_lbmol) * Fluid.MW
+        return (scfs / self._scf_per_lbmol) * self.fluid.MW
         
     @mass_flowrate.setter
     def mass_flowrate(self, mdot_lbm_s):
         self._mdot = mdot_lbm_s
-        scfs = self._mdot * self._scf_per_lbmol / Fluid.MW
+        scfs = self._mdot * self._scf_per_lbmol / self.fluid.MW
         self.Q = scfs*24*60*60/1000
 
     @property
@@ -416,18 +415,17 @@ class GasFlow:
             return f
 
 
-    def dstate_dl(self, at_distance, pressure_psia, velocity_ft_s, temperature_R = None, temperature_F=None):
+    def dstate_dl(self, at_distance, pressure_psia, temperature_R = None):
         """
+        
         """
-        if temperature_F:
-            self.T = temperature_F+459.6
-
-        self.P = pressure_psia
-
-        v = veloci
+        self.P = pressure_psia # make it easier to write the equations
+        self.T = temperature_R # make it easier to write the equations
+        rho = self.fluid.density(self.T, self.P)
+        v = 
         f = self.friction_factor()
         D = self.pipe.ID
-        rho = self.fluid.density(self.T, self.P)
+        
         dhdl = self.pipe.dhdl(at_distance)
         dudl = u / rho  # TODO
         Gravity_Force = rho * G_ft_sec2 / G_c_lbm_ft_per_lbf_s2 * dhdL
