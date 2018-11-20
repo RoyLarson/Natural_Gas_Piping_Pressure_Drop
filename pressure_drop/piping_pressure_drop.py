@@ -134,7 +134,7 @@ class SimpleNG:
 
     def specific_heat_const_p(self, temperature_R, pressure_psia):
         return self._specific_heat_residual_const_p(temperature_R, pressure_psia) + \
-                self._ideal_specific_heat_const_p(temperature_R, pressure_psia)
+                self._ideal_specific_heat_const_p(temperature_R, pressure_psia) #ft_lbf/(lbm R)
 
     def Cp(self, temperature_R, pressure_psia):
         """
@@ -203,7 +203,11 @@ class SimpleNG:
         F =  (.0657 / (Tr - .85)) - .037
         G = .32 * np.exp(-19.53 * (Tr - 1))
         C = Pr*(E+F*Pr+G*Pr**4)
-        return A+B*Pr+(1-A)*np.exp(-C)-D*(Pr/10)**4
+        return A + B * Pr + (1 - A) * np.exp(-C) - D * (Pr / 10) ** 4
+        
+    @property    
+    def Z(self, temperature_R, pressure_psia):
+        return self.compressibility(temperature_R, pressure_psia)
 
     def density(self, temperature_R, pressure_psia):
         """
@@ -246,6 +250,23 @@ class SimpleNG:
         d_dp = FinDiff(1, dP, acc=2)
         dz_dp = d_dp(self.compressibility)
         return 1 / P + (1 / z) * dz_dp
+
+    def joule_thomson_coefficient(self, temperature_R, pressure_psia):
+        """
+        From
+        Cengel BD, Boles MA (2008) Thermodynamics—an engineering approach, 6th edn. Tata McGraw Hill, New Delhi
+        """
+        P = pressure_psia
+        T = temperature_R
+        dt = .001*T
+        Cp = self.Cp(T, P)
+        Z = self.Z(T, P)
+        rho = self.density(T, P)
+        d_dT = FinDiff(0, dt, acc=2)
+        dZ_dT = d_dT(self.Z)
+
+        return (1/Cp)*(T/(Z*rho))*dZ_dT([T, P])
+
         
 
 
@@ -433,13 +454,25 @@ class GasFlow:
         d_dP = FinDiff(1, dP, acc=2)
         drho_dP = d_dP(self.fluid.density)
         drho_dT = d_dT(self.fluid.density)
-        conservation_of_mass = np.array([v*drho_dP(self.T), rho, v*drho_dT(self.P)])
+        Cp = self.fluid.Cp(self.T, self.P)
+        mu_jt = self.fluid.joule_thomson_coefficient(self.T, self.P)
+
+        conservation_of_mass = np.array([v * drho_dP(self.T), rho, v * drho_dT(self.P)])
+        
+        conservation_of_momentum = np.array([144, rho * v / G_ft_sec2, 0])
+        
+        conservation_of_energy = np.array([-rho*v*Cp*mu_jt, rho*v**2/(G_ft_sec2), rho*v*Cp])
+
+        
+
         dhdl = self.pipe.dhdl(at_distance)
         Gravity_Force = rho * G_ft_sec2 / G_c_lbm_ft_per_lbf_s2 * dhdL
         Friction_Force = f * self.pipe.area * rho * ((v_g ** 2) / (2 * G_ft_sec2)) / IN_PER_FT ** 2
         
 
-        return np.array(dPdl, dvdl, dTdl)
+        
+
+        return np.array([dPdl, dvdl, dTdl])
 
 
 
