@@ -1,4 +1,4 @@
-from .piping_pressure_drop import (SimpleNG, 
+from piping_pressure_drop import (SimpleNG, 
                                     Path, Pipe, GasFlow)
 
 if __name__ == '__main__':

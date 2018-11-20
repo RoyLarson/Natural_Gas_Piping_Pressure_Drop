@@ -177,7 +177,7 @@ class SimpleNG:
         Default value of p_crit is in psia
         from promax estimate of injection gas
         """
-        return pressure_psia/self.Pc
+        return pressure_psia / self.Pc
 
     def reduced_temp(self, temperature_R):
         """
@@ -232,21 +232,21 @@ class SimpleNG:
                     (1 + B[7] * MW_T + B[8] * MW_T ** 2 + B[9] * MW_T ** 3 + B[10] * rho))
         return mu * 0.000671968994813
 
-    def isothermal_comp(self, temperature_F, pressure_psia):
+    def isothermal_comp(self, temperature_R, pressure_psia):
         """
-        From New Correlations to Predict Natural Gas Viscosit and Compressibility Factor
+        From New Correlations to Predict Natural Gas Viscosity and Compressibility Factor
         Journal of Petroleum Science and Engineering May-15-2010
         Isothermal compressibility of a gas
         c_g = 1/p - 1/z*(dz/dp)@Constant T
         """
         P = pressure_psia
-        T = temperature_F
+        T = temperature_R
         dP = .001*P
         z = self.compressibility(T, P)
         d_dp = FinDiff(1, dP, acc=2)
         dz_dp = d_dp(self.compressibility)
-        return 1/P + (1/z)*dz_dp
-
+        return 1 / P + (1 / z) * dz_dp
+        
 
 
 class Path:
@@ -304,7 +304,7 @@ class Pipe:
     def __init__(self, pipe_ID_in, roughness_in, path=None, lengths_ft=None, angles_from_horizontal_deg=None):
         self.ID = pipe_ID_in*12 #store in feet
         self.roughness = roughness_in * 12  #store in feet
-        self.area = np.pi*self.ID**2/4
+        self.area = np.pi*(self.ID**2)/4
         if path:
             self.path = path
         elif lengths_ft and angles_from_horizontal_deg:
@@ -330,7 +330,7 @@ class GasFlow:
     _scf_per_lbmol = self._R_psi_ft3 * (self.std_T_F + F_TO_R) / self.std_P_psia
     _g = G_ft_sec2  # standard gravity ft/sec^2
 
-    def __init__(self, *, rate_mscfd, pipe, fluid, dp_with_flow=True):
+    def __init__(self, *, rate_mscfd, pipe, fluid_eos, dp_with_flow=True):
         """
         dp_with_flow = True if solving dp in the direction of flow
         dp_with_flow = False if solving dp in the against the direction of flow
@@ -338,7 +338,7 @@ class GasFlow:
 
         self.Q = rate_mscfd
         self.pipe = pipe
-        self.fluid = fluid
+        self.fluid = fluid_eos
         if dp_with_flow:
             self.direction = 1
         else:
@@ -371,19 +371,19 @@ class GasFlow:
 
     @property
     def P(self):
-        return self.pressure
+        return self.pressure # psia
     
     @P.setter
     def P(self, P):
-        self.pressure = P
+        self.pressure = P # psia
 
     @property
     def T(self):
-        return self.temperature
+        return self.temperature # deg_R
 
     @T.setter
-    def T(self, temperature_F):
-        self.temperature = temperature_F
+    def T(self, temperature_R):
+        self.temperature = temperature_R
 
     def velocity(self):
         return self._mdot / (self.fluid.density(self.T, self.P) * self.pipe.area)
@@ -407,7 +407,7 @@ class GasFlow:
         else:
             f = self._f + .00001 # add small delta so that the while loop enters (2 orders of magnitude greater than condition)
             while abs(self._f-f)>.0000001:
-                "Function is know to be recursive and quick to converge.  "
+                "Function is known to be recursive and quick to converge.  "
                 self._f = f
                 f = (1 / (-2 * np.log10(2.825 / (Re * f ** .5))))** 2
             
@@ -415,22 +415,31 @@ class GasFlow:
             return f
 
 
-    def dstate_dl(self, at_distance, pressure_psia, temperature_R = None):
+    def d_dl(self, at_distance, pressure_psia, velocity_ft_sec, temperature_R):
         """
         
         """
         self.P = pressure_psia # make it easier to write the equations
         self.T = temperature_R # make it easier to write the equations
-        rho = self.fluid.density(self.T, self.P)
-        v = 
+        rho = self.fluid.density(self.T, self.P) # lbm/ft**2
+        v = self.velocity() # ft/sec
+        if abs(velocity_ft_sec - v) > .0001:
+            raise RuntimeError("Velocity is diverging from actual in pressure drop calc")
         f = self.friction_factor()
-        D = self.pipe.ID
-        
+        D = self.pipe.ID  # ft
+        dT = .001 * self.T
+        dP = .001 * self.P
+        d_dT = FinDiff(0, dT, acc=2)
+        d_dP = FinDiff(1, dP, acc=2)
+        drho_dP = d_dP(self.fluid.density)
+        drho_dT = d_dT(self.fluid.density)
+        conservation_of_mass = np.array([v*drho_dP(self.T), rho, v*drho_dT(self.P)])
         dhdl = self.pipe.dhdl(at_distance)
-        dudl = u / rho  # TODO
         Gravity_Force = rho * G_ft_sec2 / G_c_lbm_ft_per_lbf_s2 * dhdL
-        Friction_Force = f*self.pipe.area*rho*((v_g**2)/(2*G_ft_sec2))/IN_PER_FT**2
-        return np.array(dpdl, dvdl, dTdl)
+        Friction_Force = f * self.pipe.area * rho * ((v_g ** 2) / (2 * G_ft_sec2)) / IN_PER_FT ** 2
+        
+
+        return np.array(dPdl, dvdl, dTdl)
 
 
 
