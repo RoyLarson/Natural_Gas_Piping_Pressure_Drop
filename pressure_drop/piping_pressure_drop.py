@@ -15,6 +15,27 @@ G_c_lbm_ft_per_lbf_s2 = 32.174
 G_ft_sec2 = 32.174
 IN_PER_FT = 12
 
+def finite_partial(func, dx, arg_num, acc_order, func_args):
+    if (acc_order % 2) != 0:
+        raise ValueError("Acc_Order Must Be Even")
+
+    points = []
+    d_dx = FinDiff(arg_num, dx, acc = acc_order)
+    for i, arg in enumerate(func_args):
+        if i == arg_num:
+            delta = dx * float(acc_order // 2)
+        
+            values = np.arange(arg - delta, arg + delta+dx, dx)
+            print(values)
+            points.append(values)
+        else:
+            points.append(np.ones(acc_order + 1) * arg)
+    print(points)        
+    df_dx = d_dx(func(*points))
+    print(df_dx)
+    return df_dx[acc_order//2]
+
+
 class SimpleNG:
     """
     Calculates the equation of state for a natural gas that is solely specified by the Molecular Weight
@@ -51,7 +72,8 @@ class SimpleNG:
 
         self.Pc = self._calc_Pc()
         self.Tc = self._calc_Tc()
-
+        self.d_dT = FinitePartial()
+        
     @property
     def MW(self):
         return self._MW
@@ -152,11 +174,14 @@ class SimpleNG:
         T = temperature_R
         dT = T * .001
         dP = P * .001
+        diff_Ts = np.arrange(T - 3 * dT, T + 3 * dT, dT)
+        diff_Ps = np.arrange(P - 3 * dP, P + 3 * dP, dP)
+        n_steps = len(diff_Ts)
         Cp = self.Cp(T, P)
         R = self.R_ft_lb/self.MW
         Z = self.compressibility(T, P)
         d_dT = FinDiff(0, dT, acc=2)
-        dZ_dT = d_dT(self.compressibility)
+        dZ_dT = d_dT(self.compressibility(diff_Ts, np.ones(n_steps)*P))[np.ind]
         d_dP = FinDiff(1, dP, acc=2)
         dZ_dP = d_dP(self.compressibility)
         dV_dP_T = (R*T/P)*(dZ_dP + Z/P)
@@ -347,8 +372,8 @@ class GasFlow:
     _std_P_psia = 14.696
     _std_T_F = 59.0
     _R_psi_ft3 = R_PSI_FT3_PER_LBMOL_DEGR  #psi*ft**3 /(deg_R * lbmol)
-    _R_lbf = self._R_psi_ft3 *FT_LB_PER_PSI_FT3
-    _scf_per_lbmol = self._R_psi_ft3 * (self.std_T_F + F_TO_R) / self.std_P_psia
+    _R_lbf = _R_psi_ft3 *FT_LB_PER_PSI_FT3
+    _scf_per_lbmol = _R_psi_ft3 * (_std_T_F + F_TO_R) / _std_P_psia
     _g = G_ft_sec2  # standard gravity ft/sec^2
 
     def __init__(self, *, rate_mscfd, pipe, fluid_eos, dp_with_flow=True):
