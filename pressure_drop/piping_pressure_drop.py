@@ -15,25 +15,26 @@ G_c_lbm_ft_per_lbf_s2 = 32.174
 G_ft_sec2 = 32.174
 IN_PER_FT = 12
 
-def finite_partial(func, dx, arg_num, acc_order, func_args):
-    if (acc_order % 2) != 0:
-        raise ValueError("Acc_Order Must Be Even")
+class FinitePartial(FinDiff):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    points = []
-    d_dx = FinDiff(arg_num, dx, acc = acc_order)
-    for i, arg in enumerate(func_args):
-        if i == arg_num:
-            delta = dx * float(acc_order // 2)
+    def __call__(self, func, points):
+        axis = self.root.axes[0]
+        dx = self.root.spac[axis]
+        num_grid_points_necessary = ((self.root.order-1)//2)*2 + self.acc+1
+        grid = []
+        for i, point in enumerate(points):
+            if i == axis:
+                grid.append(np.arange(point - dx * (num_grid_points_necessary // 2), point + dx * (num_grid_points_necessary // 2 + 1), dx))
+            else:
+                grid.append(np.ones(num_grid_points_necessary) * point)
+                
+        F = func(grid)
+        return self.root.apply(self, F)[num_grid_points_necessary//2+1]            
+
+
         
-            values = np.arange(arg - delta, arg + delta+dx, dx)
-            print(values)
-            points.append(values)
-        else:
-            points.append(np.ones(acc_order + 1) * arg)
-    print(points)        
-    df_dx = d_dx(func(*points))
-    print(df_dx)
-    return df_dx[acc_order//2]
 
 
 class SimpleNG:
